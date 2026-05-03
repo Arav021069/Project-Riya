@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+jinja2
+pydantic
+ollama
+langchain-core
+python-dotenv

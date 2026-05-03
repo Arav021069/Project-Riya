@@ -1,0 +1,59 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+
+# --- Environment & Secrets ---
+.env
+.env.*
+secrets.json
+*.pem
+
+# --- Database & History ---
+# We ignore history.json because it contains user data/chats
+history.json
+history.json.bak
+
+# --- Logs ---
+*.log
+server_err.log
+server_sync.log
+server.log
+
+# --- IDEs ---
+.idea/
+.vscode/
+*.swp
+*.swo
+.project
+.pydevproject
+.settings/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Docker ---
+# Usually not ignored, but sometimes local overrides are
+docker-compose.override.yml

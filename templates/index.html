@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbot</title>
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #343541;
+            color: #ececf1;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+        }
+
+        #sidebar {
+            width: 260px;
+            background-color: #202123;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            flex-shrink: 0;
+        }
+
+        #new-chat-btn {
+            border: 1px solid #4d4d4f;
+            border-radius: 5px;
+            padding: 12px;
+            color: white;
+            background: transparent;
+            cursor: pointer;
+            text-align: left;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #new-chat-btn:hover {
+            background-color: #2b2c2f;
+        }
+
+        #history-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .history-item {
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #ececf1;
+        }
+
+        .history-item:hover {
+            background-color: #2b2c2f;
+        }
+
+        .history-item.active {
+            background-color: #343541;
+        }
+
+        #main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #343541;
+            position: relative;
+        }
+
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .message-wrapper {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            padding: 25px 0;
+        }
+
+        .user-message-wrapper { background-color: #343541; }
+        .ai-message-wrapper { background-color: #444654; }
+
+        .message-content {
+            max-width: 800px;
+            width: 90%;
+            display: flex;
+            gap: 20px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .avatar {
+            width: 30px; height: 30px; border-radius: 2px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; flex-shrink: 0;
+        }
+
+        .user-avatar { background-color: #5436da; }
+        .ai-avatar { background-color: #10a37f; }
+
+        .text { white-space: pre-wrap; word-break: break-word; }
+
+        #input-container {
+            padding: 20px;
+            background-image: linear-gradient(180deg, rgba(53, 55, 64, 0), #353740 50%);
+            display: flex; justify-content: center;
+        }
+
+        #input-form {
+            max-width: 800px; width: 90%;
+            position: relative; background-color: #40414f;
+            border-radius: 12px; padding: 10px 15px;
+            display: flex; align-items: center;
+        }
+
+        #user-input {
+            width: 100%; background: transparent; border: none;
+            color: white; font-size: 16px; outline: none;
+            resize: none; max-height: 200px; padding: 5px;
+        }
+
+        #send-btn {
+            background-color: transparent; border: none;
+            color: #acacbe; cursor: pointer; padding: 5px;
+        }
+
+        #send-btn:disabled { opacity: 0.3; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <button id="new-chat-btn">
+            <span>+</span> New chat
+        </button>
+        <div id="history-list">
+            <!-- History items will be injected here -->
+        </div>
+    </div>
+
+    <div id="main-content">
+        <div id="chat-container"></div>
+        <div id="input-container">
+            <form id="input-form">
+                <textarea id="user-input" placeholder="Send a message..." rows="1"></textarea>
+                <button type="submit" id="send-btn" disabled>
+                    <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="20" width="20" xmlns="http://www.w3.org/2000/svg"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const historyList = document.getElementById('history-list');
+        const inputForm = document.getElementById('input-form');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const newChatBtn = document.getElementById('new-chat-btn');
+
+        let currentSessionId = null;
+
+        async function loadSessions() {
+            const res = await fetch('/api/sessions');
+            const sessions = await res.json();
+            historyList.innerHTML = '';
+            sessions.forEach(session => {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                if (session.id === currentSessionId) item.classList.add('active');
+                item.innerText = session.title;
+                item.onclick = () => loadSession(session.id);
+                historyList.appendChild(item);
+            });
+        }
+
+        async function loadSession(sessionId) {
+            currentSessionId = sessionId;
+            chatContainer.innerHTML = '';
+            const res = await fetch(`/api/sessions/${sessionId}`);
+            const data = await res.json();
+            data.messages.forEach(msg => {
+                appendMessage(msg.role === 'user' ? 'user' : 'ai', msg.content);
+            });
+            loadSessions(); // refresh active state
+        }
+
+        newChatBtn.onclick = () => {
+            currentSessionId = null;
+            chatContainer.innerHTML = '';
+            loadSessions();
+        };
+
+        userInput.addEventListener('input', () => {
+            userInput.style.height = 'auto';
+            userInput.style.height = userInput.scrollHeight + 'px';
+            sendBtn.disabled = !userInput.value.trim();
+        });
+
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                inputForm.dispatchEvent(new Event('submit'));
+            }
+        });
+
+        function appendMessage(role, text = '') {        
+            const wrapper = document.createElement('div');
+            wrapper.className = `message-wrapper ${role}-message-wrapper`;
+            const content = document.createElement('div');
+            content.className = 'message-content';  
+            const avatar = document.createElement('div');
+            avatar.className = `avatar ${role}-avatar`;
+            avatar.innerText = role === 'user' ? 'U' : 'AI';
+            const textDiv = document.createElement('div');
+            textDiv.className = 'text';
+            textDiv.innerText = text;
+            content.appendChild(avatar);
+            content.appendChild(textDiv);
+            wrapper.appendChild(content);
+            chatContainer.appendChild(wrapper);     
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return textDiv;
+        }
+
+        // Configure marked to use highlight.js
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(code, { language: lang }).value;
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true
+        });
+
+        inputForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const message = userInput.value.trim(); 
+            if (!message) return;
+
+            const userTextDiv = appendMessage('user');
+            userTextDiv.innerText = message; 
+
+            userInput.value = '';
+            userInput.style.height = 'auto';        
+            sendBtn.disabled = true;
+
+            const aiTextDiv = appendMessage('ai'); 
+            let accumulatedText = '';
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message, session_id: currentSessionId })
+                });
+
+                if (!currentSessionId) {
+                    currentSessionId = response.headers.get('X-Session-ID');
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    accumulatedText += decoder.decode(value, { stream: true });
+                    aiTextDiv.innerHTML = marked.parse(accumulatedText);
+                    
+                    // Highlight blocks as they complete or change
+                    aiTextDiv.querySelectorAll('pre code').forEach((el) => {
+                        hljs.highlightElement(el);
+                    });
+
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+                loadSessions(); // Refresh sidebar titles
+            } catch (error) {
+                aiTextDiv.innerText = 'Error: Could not connect to the server.';
+            }
+        });
+
+        loadSessions();
+    </script>
+</body>
+</html>

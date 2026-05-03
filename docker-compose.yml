@@ -1,0 +1,14 @@
+services:
+  # Your Python Application
+  app:
+    build: .
+    container_name: gemma4-app
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - /app/gemma4 
+    environment:
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
