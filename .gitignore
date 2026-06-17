@@ -24,6 +24,11 @@ wheels/
 venv/
 ENV/
 
+# Personal AI instructions
+gemini.md
+agent.md
+soul.md
+
 # --- Environment & Secrets ---
 .env
 .env.*
@@ -57,3 +62,9 @@ Thumbs.db
 # --- Docker ---
 # Usually not ignored, but sometimes local overrides are
 docker-compose.override.yml
+
+# --- SQLite ---
+riya.db
+*.db-journal
+*.db-wal
+*.db-shm

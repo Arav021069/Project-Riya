@@ -2,12 +2,12 @@ services:
   # Your Python Application
   app:
     build: .
-    container_name: gemma4-app
+    container_name: Riyagpt-app
     ports:
       - "8000:8000"
     volumes:
       - .:/app
-      - /app/gemma4 
+      - /app/Riyagpt
     environment:
       - OLLAMA_HOST=http://host.docker.internal:11434
     extra_hosts:
