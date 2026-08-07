@@ -1,9 +1,28 @@
+# IDE & Version Control
+.git
+.vscode
+.idea
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-.env
-.venv
-env/
+.venv/
 venv/
-history.json
+env/
+
+# Node/Frontend
+node_modules/
+dist/
+
+# App Specific / Assets
 Riyagpt/
+gemini.md
+logo.mp4
+history.json
+*.db
+
+# Environment & OS
+.env
+.DS_Store
+Thumbs.db

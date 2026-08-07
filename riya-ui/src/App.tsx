@@ -17,6 +17,25 @@ interface Session {
   timestamp: string;
 }
 
+interface ApiModelDetails {
+  model_name: string;
+  details?: {
+    license?: string;
+    modelfile?: string;
+    parameters?: string;
+    template?: string;
+    system?: string;
+    details?: {
+      parent_model?: string;
+      format?: string;
+      family?: string;
+      families?: string[];
+      parameter_size?: string;
+      quantization_level?: string;
+    };
+  };
+}
+
 function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -25,8 +44,48 @@ function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [activeModel, setActiveModel] = useState('gemma4:31b-cloud');
   const [showModal, setShowModal] = useState(false);
+  const [modelDetails, setModelDetails] = useState<ApiModelDetails | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [showScrollDown, setShowScrollDown] = useState(false);
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showModal || !activeModel) return;
+
+    let ignore = false;
+    const fetchModelDetails = async () => {
+      setIsLoadingDetails(true);
+      setDetailsError(null);
+      try {
+        const res = await fetch(`/api/models/${encodeURIComponent(activeModel)}`);
+        if (!res.ok) {
+          throw new Error(`Failed to load details for ${activeModel}: ${res.statusText}`);
+        }
+        const data = await res.json();
+        if (!ignore) {
+          setModelDetails(data);
+        }
+      } catch (err) {
+        console.error('Error fetching model details:', err);
+        if (!ignore) {
+          setDetailsError(err instanceof Error ? err.message : 'Unknown error');
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoadingDetails(false);
+        }
+      }
+    };
+
+    void fetchModelDetails();
+
+    return () => {
+      ignore = true;
+    };
+  }, [showModal, activeModel]);
 
   useEffect(() => {
     const fetchActiveModel = async () => {
@@ -105,10 +164,32 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    const container = chatContainerRef.current;
+
+    if (!container) return;
+
+    const distanceFromBottom =
+        container.scrollHeight -
+        container.scrollTop -
+        container.clientHeight;
+
+    if (distanceFromBottom < 200) {
+        container.scrollTop = container.scrollHeight;
     }
-  }, [messages]);
+}, [messages]);
+
+  const handleScroll = () => {
+    const container = chatContainerRef.current;
+
+    if (!container) return;
+
+    const distanceFromBottom =
+        container.scrollHeight -
+        container.scrollTop -
+        container.clientHeight;
+
+    setShowScrollDown(distanceFromBottom > 200);
+};
 
   const loadSession = async (sessionId: string) => {
     if (isStreaming) return;
@@ -217,10 +298,24 @@ function App() {
 
   return (
     <div className="root-container" style={{ display: 'flex', width: '100%', height: '100%' }}>
-      <div className="sidebar">
-        <button className="new-chat-btn" onClick={startNewChat}>
-          <Plus size={16} /> New chat
-        </button>
+      <div className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+        <div className="sidebar-header">
+          <button className="new-chat-btn" onClick={startNewChat}>
+            <Plus size={16} />
+            <span className="btn-text">New chat</span>
+          </button>
+          <button 
+            className="sidebar-toggle-btn" 
+            onClick={() => setIsSidebarCollapsed(true)}
+            title="Close sidebar"
+          >
+            <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="16" width="16" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="9" y1="3" x2="9" y2="21"></line>
+              <path d="M17 16l-4-4 4-4"></path>
+            </svg>
+          </button>
+        </div>
         <div className="history-list">
           {sessions.map(session => (
             <div 
@@ -239,8 +334,23 @@ function App() {
 
       <div className="main-content">
         <div className="header-bar">
-          <div className="header-logo">
-            <span className="logo-accent">RIYA</span>GPT
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {isSidebarCollapsed && (
+              <button 
+                className="sidebar-toggle-btn header-toggle-btn" 
+                onClick={() => setIsSidebarCollapsed(false)}
+                title="Open sidebar"
+              >
+                <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="16" width="16" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="9" y1="3" x2="9" y2="21"></line>
+                  <path d="M13 8l4 4-4 4"></path>
+                </svg>
+              </button>
+            )}
+            <div className="header-logo">
+              <span className="logo-accent">RIYA</span>GPT
+            </div>
           </div>
           <div className="header-model-selector" onClick={() => setShowModal(true)}>
             <span className="model-indicator-dot"></span>
@@ -248,7 +358,7 @@ function App() {
           </div>
         </div>
 
-        <div className="chat-container" ref={chatContainerRef}>
+        <div className="chat-container" ref={chatContainerRef} onScroll={handleScroll}>
           {messages.map((msg, idx) => (
             <div key={idx} className={`message-wrapper ${msg.role === 'user' ? 'user-message-wrapper' : 'ai-message-wrapper'}`}>
               <div className="message-content">
@@ -291,6 +401,19 @@ function App() {
             </div>
           ))}
         </div>
+        
+        {showScrollDown && (
+          <button 
+            className="scroll-down-btn"
+            onClick={() => {
+              chatContainerRef.current?.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: 'smooth' });
+              // setShowScrollDown(false);
+            }}
+            title="Scroll to bottom"
+          >
+            ↓
+          </button>
+        )}
 
         <div className="input-container">
           <form className="input-form" onSubmit={handleSend}>
@@ -320,29 +443,72 @@ function App() {
               </button>
             </div>
             <div className="modal-body">
-              <div className="model-info-hero">
-                <div className="model-title-large">{activeModel}</div>
-                <div className="model-type-badge">{getModelDetails(activeModel).type}</div>
-              </div>
-              <p className="model-description">{getModelDetails(activeModel).description}</p>
-              <div className="model-spec-grid">
-                <div className="spec-card">
-                  <span className="spec-label">Family</span>
-                  <span className="spec-value">{getModelDetails(activeModel).family}</span>
+              {isLoadingDetails ? (
+                <div className="modal-loading-container">
+                  <div className="spinner"></div>
+                  <p>Fetching specifications from Ollama...</p>
                 </div>
-                <div className="spec-card">
-                  <span className="spec-label">Parameters</span>
-                  <span className="spec-value">{getModelDetails(activeModel).parameters}</span>
-                </div>
-                <div className="spec-card">
-                  <span className="spec-label">Quantization</span>
-                  <span className="spec-value">{getModelDetails(activeModel).quantization}</span>
-                </div>
-                <div className="spec-card">
-                  <span className="spec-label">Format</span>
-                  <span className="spec-value">{getModelDetails(activeModel).format}</span>
-                </div>
-              </div>
+              ) : (
+                <>
+                  {detailsError && (
+                    <div className="details-error-banner">
+                      ⚠️ Showing offline cached specifications. (Error: {detailsError})
+                    </div>
+                  )}
+                  <div className="model-info-hero">
+                    <div className="model-title-large">{activeModel}</div>
+                    <div className="model-type-badge">
+                      {modelDetails?.details?.details?.format
+                        ? `Local ${modelDetails.details.details.format.toUpperCase()} LLM`
+                        : getModelDetails(activeModel).type}
+                    </div>
+                  </div>
+                  <p className="model-description">
+                    {getModelDetails(activeModel).description}
+                  </p>
+                  <div className="model-spec-grid">
+                    <div className="spec-card">
+                      <span className="spec-label">Family</span>
+                      <span className="spec-value">
+                        {(() => {
+                          const fam = modelDetails?.details?.details?.family;
+                          if (fam) {
+                            return fam.charAt(0).toUpperCase() + fam.slice(1);
+                          }
+                          return getModelDetails(activeModel).family;
+                        })()}
+                      </span>
+                    </div>
+                    <div className="spec-card">
+                      <span className="spec-label">Parameters</span>
+                      <span className="spec-value">
+                        {modelDetails?.details?.details?.parameter_size || getModelDetails(activeModel).parameters}
+                      </span>
+                    </div>
+                    <div className="spec-card">
+                      <span className="spec-label">Quantization</span>
+                      <span className="spec-value">
+                        {modelDetails?.details?.details?.quantization_level || getModelDetails(activeModel).quantization}
+                      </span>
+                    </div>
+                    <div className="spec-card">
+                      <span className="spec-label">Format</span>
+                      <span className="spec-value">
+                        {(modelDetails?.details?.details?.format || getModelDetails(activeModel).format).toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {modelDetails?.details?.system && (
+                    <div className="model-system-prompt-section">
+                      <span className="spec-label">System Prompt / Instructions</span>
+                      <pre className="system-prompt-content">
+                        <code>{modelDetails.details.system}</code>
+                      </pre>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -11,8 +11,8 @@
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #343541;
-            color: #ececf1;
+            background-color: #000000;
+            color: #ffffff;
             margin: 0;
             display: flex;
             height: 100vh;
@@ -20,29 +20,95 @@
 
         #sidebar {
             width: 260px;
-            background-color: #202123;
+            background-color: #000000;
             display: flex;
             flex-direction: column;
             padding: 10px;
             flex-shrink: 0;
+            border-right: 1px solid #1a1a1a;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease;
+            overflow: hidden;
+        }
+
+        #sidebar.collapsed {
+            width: 0;
+            min-width: 0;
+            padding-left: 0;
+            padding-right: 0;
+            border-right-color: transparent;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            align-items: center;
+            width: 100%;
         }
 
         #new-chat-btn {
-            border: 1px solid #4d4d4f;
+            border: 1px solid #ffffff;
             border-radius: 5px;
             padding: 12px;
             color: white;
             background: transparent;
             cursor: pointer;
             text-align: left;
-            margin-bottom: 20px;
+            flex: 1;
             display: flex;
             align-items: center;
             gap: 10px;
+            transition: all 0.3s ease;
+            min-width: 0;
+        }
+
+        #new-chat-btn .btn-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         #new-chat-btn:hover {
-            background-color: #2b2c2f;
+            background-color: #ffffff;
+            color: #000000;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
+            border-color: #ffffff;
+        }
+
+        .sidebar-toggle-btn {
+            border: 1px solid #262626;
+            border-radius: 5px;
+            padding: 12px;
+            color: #a3a3a3;
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .sidebar-toggle-btn:hover {
+            border-color: #ffffff;
+            color: #ffffff;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
+        }
+
+        .header-toggle-btn {
+            padding: 8px;
+            border-color: #262626;
+        }
+
+        .header-bar {
+            display: flex;
+            align-items: center;
+            padding: 12px 24px;
+            background-color: rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid #1a1a1a;
+            backdrop-filter: blur(10px);
+            z-index: 10;
         }
 
         #history-list {
@@ -58,25 +124,31 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 14px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            color: #ececf1;
+            color: #a3a3a3;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+            border-left: 2px solid transparent;
         }
 
         .history-item:hover {
-            background-color: #2b2c2f;
+            background-color: #1a1a1a;
+            color: #ffffff;
         }
 
         .history-item.active {
-            background-color: #343541;
+            background-color: #262626;
+            color: #ffffff;
+            border-left-color: #ffffff;
+            box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.05);
         }
 
         #main-content {
             flex: 1;
             display: flex;
             flex-direction: column;
-            background-color: #343541;
+            background-color: #0a0a0a;
             position: relative;
         }
 
@@ -94,10 +166,11 @@
             display: flex;
             justify-content: center;
             padding: 25px 0;
+            border-bottom: 1px solid #141414;
         }
 
-        .user-message-wrapper { background-color: #343541; }
-        .ai-message-wrapper { background-color: #444654; }
+        .user-message-wrapper { background-color: #0a0a0a; }
+        .ai-message-wrapper { background-color: #121212; }
 
         .message-content {
             max-width: 800px;
@@ -109,27 +182,46 @@
         }
 
         .avatar {
-            width: 30px; height: 30px; border-radius: 2px;
+            width: 30px; height: 30px; border-radius: 4px;
             display: flex; align-items: center; justify-content: center;
             font-weight: bold; flex-shrink: 0;
+            font-size: 12px;
         }
 
-        .user-avatar { background-color: #5436da; }
-        .ai-avatar { background-color: #10a37f; }
+        .user-avatar {
+            background-color: #ffffff;
+            color: #000000;
+            border: 1px solid #ffffff;
+        }
+        
+        .ai-avatar {
+            background-color: #000000;
+            color: #ffffff;
+            border: 1px solid #ffffff;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
+        }
 
         .text { white-space: pre-wrap; word-break: break-word; }
 
         #input-container {
             padding: 20px;
-            background-image: linear-gradient(180deg, rgba(53, 55, 64, 0), #353740 50%);
+            background-image: linear-gradient(180deg, rgba(10, 10, 10, 0), #0a0a0a 50%);
             display: flex; justify-content: center;
         }
 
         #input-form {
             max-width: 800px; width: 90%;
-            position: relative; background-color: #40414f;
+            position: relative; background-color: #000000;
             border-radius: 12px; padding: 10px 15px;
             display: flex; align-items: center;
+            border: 1px solid #262626;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+        }
+
+        #input-form:focus-within, #input-form:hover {
+            border-color: #ffffff;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
         }
 
         #user-input {
@@ -144,20 +236,60 @@
         }
 
         #send-btn:disabled { opacity: 0.3; }
+
+        /* Delete button styling */
+        .delete-btn {
+            background: transparent;
+            border: none;
+            color: #acacbe;
+            cursor: pointer;
+            padding: 2px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+
+        .delete-btn:hover {
+            color: #ff4d4f;
+        }
+
+        .history-item:hover .delete-btn {
+            display: flex;
+        }
     </style>
 </head>
 <body>
 
     <div id="sidebar">
-        <button id="new-chat-btn">
-            <span>+</span> New chat
-        </button>
+        <div class="sidebar-header">
+            <button id="new-chat-btn">
+                <span>+</span>
+                <span class="btn-text">New chat</span>
+            </button>
+            <button class="sidebar-toggle-btn" onclick="toggleSidebar(true)" title="Close sidebar">
+                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="16" width="16" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                    <path d="M17 16l-4-4 4-4"></path>
+                </svg>
+            </button>
+        </div>
         <div id="history-list">
             <!-- History items will be injected here -->
         </div>
     </div>
 
     <div id="main-content">
+        <div class="header-bar" id="header-bar" style="display: none;">
+            <button class="sidebar-toggle-btn header-toggle-btn" onclick="toggleSidebar(false)" title="Open sidebar">
+                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="16" width="16" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                    <path d="M13 8l4 4-4 4"></path>
+                </svg>
+            </button>
+        </div>
         <div id="chat-container"></div>
         <div id="input-container">
             <form id="input-form">
@@ -326,6 +458,18 @@
                 aiTextDiv.innerText = 'Error: Could not connect to the server.';
             }
         });
+
+        function toggleSidebar(collapse) {
+            const sidebar = document.getElementById('sidebar');
+            const headerBar = document.getElementById('header-bar');
+            if (collapse) {
+                sidebar.classList.add('collapsed');
+                headerBar.style.display = 'block';
+            } else {
+                sidebar.classList.remove('collapsed');
+                headerBar.style.display = 'none';
+            }
+        }
 
         loadSessions();
     </script>
