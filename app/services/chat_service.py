@@ -1,6 +1,8 @@
+import json
 from typing import Generator
 from app.services.session_service import SessionService
 from core.ollama_service import OllamaService, OLLAMA_TOOLS, TOOL_REGISTRY
+from core.prompts import SYSTEM_PROMPT
 
 class ChatService:
     def __init__(self):
@@ -19,18 +21,28 @@ class ChatService:
         try:
             # Fetch history from DB for context via SessionService
             history_messages = self.session_service.get_session_history(session_id)
+            
+            # Inject System Prompt at the start of the conversation
+            messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history_messages
+            # Add the current user message
+            messages.append({"role": "user", "content": user_message})
 
             # Step 1: Call Ollama with tools enabled
-            stream = self.ollama.chat(selected_model, history_messages, tools=OLLAMA_TOOLS)
+            stream = self.ollama.chat(selected_model, messages, tools=OLLAMA_TOOLS)
 
             tool_calls_to_execute = []
+            last_assistant_msg = None
 
             for chunk in stream:
                 message = chunk.get("message", {})
                 
+                print(f"\n[DEBUG] Raw Model Response: {message}")
+                
                 # Capture tool calls requested by the model
                 if "tool_calls" in message and message["tool_calls"]:
+                    print(f"[DEBUG] Tool Call Detected: {message['tool_calls']}")
                     tool_calls_to_execute.extend(message["tool_calls"])
+                    last_assistant_msg = message # Capture the exact message object
                 
                 content = message.get("content", "")
                 if content:
@@ -39,7 +51,8 @@ class ChatService:
 
             # Step 2: If the model decided to execute one or more tools
             if tool_calls_to_execute:
-                assistant_tool_msg = {
+                # Use the actual message returned by the model, or fall back to a manual one
+                assistant_tool_msg = last_assistant_msg or {
                     "role": "assistant",
                     "content": "",
                     "tool_calls": tool_calls_to_execute
@@ -53,23 +66,24 @@ class ChatService:
 
                     if func_name in TOOL_REGISTRY:
                         try:
-                            if func_name == "time":
-                                result = TOOL_REGISTRY[func_name]()
-                            else:
-                                result = TOOL_REGISTRY[func_name](**func_args)
+                            # Execute the tool with its arguments
+                            result = TOOL_REGISTRY[func_name](**func_args)
+                            print(f"[DEBUG] Tool {func_name} returned: {result}")
                         except Exception as e:
                             result = f"Error executing tool {func_name}: {str(e)}"
+                            print(f"[DEBUG] Tool {func_name} crashed: {result}")
                     else:
                         result = f"Error: Tool '{func_name}' is not registered."
+                        print(f"[DEBUG] {result}")
 
                     tool_messages.append({
                         "role": "tool",
-                        "content": str(result),
+                        "content": json.dumps(result) if isinstance(result, (dict, list)) else str(result),
                         "name": func_name
                     })
 
-                # Combine history, assistant tool request, and tool execution results
-                updated_messages = history_messages + [assistant_tool_msg] + tool_messages
+                # Combine original messages, assistant tool request, and tool execution results
+                updated_messages = messages + [assistant_tool_msg] + tool_messages
 
                 # Step 3: Run the second completion to get the final text response
                 final_stream = self.ollama.chat(selected_model, updated_messages)

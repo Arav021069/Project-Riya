@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Plus, Send, Trash2, X } from 'lucide-react';
+import {Plus, Send, Trash2, X, ImagePlus } from 'lucide-react';
 import './App.css';
 
 interface Message {
@@ -36,21 +36,24 @@ interface ApiModelDetails {
   };
 }
 
-function App() {
+export default function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [activeModel, setActiveModel] = useState('gemma4:31b-cloud');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [showScrollDown, setShowScrollDown] = useState(false);
+  const [activeModel, setActiveModel] = useState("gemma4:31b-cloud");
   const [showModal, setShowModal] = useState(false);
   const [modelDetails, setModelDetails] = useState<ApiModelDetails | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [showScrollDown, setShowScrollDown] = useState(false);
-  
+  const [attachments, setAttachments] = useState<File[]>([]);
+
+
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!showModal || !activeModel) return;
@@ -62,7 +65,10 @@ function App() {
       try {
         const res = await fetch(`/api/models/${encodeURIComponent(activeModel)}`);
         if (!res.ok) {
-          throw new Error(`Failed to load details for ${activeModel}: ${res.statusText}`);
+          // throw new Error(`Failed to load details for ${activeModel}: ${res.statusText}`);
+          setDetailsError("Failed to load details for ${activeModel}: ${res.statusText}");
+          setIsLoadingDetails(false);
+          return;
         }
         const data = await res.json();
         if (!ignore) {
@@ -81,10 +87,7 @@ function App() {
     };
 
     void fetchModelDetails();
-
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, [showModal, activeModel]);
 
   useEffect(() => {
@@ -132,7 +135,6 @@ function App() {
       description: 'A locally hosted large language model running via Ollama on your system.'
     };
   };
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -158,38 +160,24 @@ function App() {
       }
     };
     void fetchInitialSessions();
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, []);
 
   useEffect(() => {
     const container = chatContainerRef.current;
-
     if (!container) return;
-
-    const distanceFromBottom =
-        container.scrollHeight -
-        container.scrollTop -
-        container.clientHeight;
-
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     if (distanceFromBottom < 200) {
-        container.scrollTop = container.scrollHeight;
+      container.scrollTop = container.scrollHeight;
     }
-}, [messages]);
+  }, [messages]);
 
   const handleScroll = () => {
     const container = chatContainerRef.current;
-
     if (!container) return;
-
-    const distanceFromBottom =
-        container.scrollHeight -
-        container.scrollTop -
-        container.clientHeight;
-
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     setShowScrollDown(distanceFromBottom > 200);
-};
+  };
 
   const loadSession = async (sessionId: string) => {
     if (isStreaming) return;
@@ -213,7 +201,6 @@ function App() {
   const deleteSession = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to delete this conversation?')) return;
-    
     try {
       const res = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
       if (res.ok) {
@@ -238,7 +225,6 @@ function App() {
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
     setIsStreaming(true);
 
-    // Placeholder for AI response
     setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
     try {
@@ -262,7 +248,6 @@ function App() {
           const { done, value } = await reader.read();
           if (done) break;
           accumulatedText += decoder.decode(value, { stream: true });
-          
           setMessages(prev => {
             const newMessages = [...prev];
             newMessages[newMessages.length - 1].content = accumulatedText;
@@ -270,7 +255,7 @@ function App() {
           });
         }
       }
-      fetchSessions(); // Refresh sidebar
+      fetchSessions();
     } catch (error) {
       console.error('Chat error:', error);
       setMessages(prev => {
@@ -296,141 +281,176 @@ function App() {
     e.target.style.height = `${e.target.scrollHeight}px`;
   };
 
+  const handleFilechange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      setAttachments(prev => [...prev, ...filesArray]);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   return (
-    <div className="root-container" style={{ display: 'flex', width: '100%', height: '100%' }}>
-      <div className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
-        <div className="sidebar-header">
-          <button className="new-chat-btn" onClick={startNewChat}>
-            <Plus size={16} />
-            <span className="btn-text">New chat</span>
-          </button>
-          <button 
-            className="sidebar-toggle-btn" 
-            onClick={() => setIsSidebarCollapsed(true)}
-            title="Close sidebar"
-          >
-            <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="16" width="16" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="9" y1="3" x2="9" y2="21"></line>
-              <path d="M17 16l-4-4 4-4"></path>
-            </svg>
-          </button>
-        </div>
-        <div className="history-list">
-          {sessions.map(session => (
-            <div 
-              key={session.id} 
-              className={`history-item ${session.id === currentSessionId ? 'active' : ''}`}
-              onClick={() => loadSession(session.id)}
+    <div>
+      <div className="root-container" style={{ display: 'flex', width: '100vw', height: '100vh' }}>
+        <aside className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+          <div className="sidebar-header">
+            <button className="new-chat-btn" onClick={startNewChat}>
+              <Plus size={16} />
+              <span className="btn-text">New chat</span>
+            </button>
+            <button 
+              className="sidebar-toggle-btn" 
+              onClick={() => setIsSidebarCollapsed(true)}
+              title="Close sidebar"
             >
-              <span className="history-text">{session.title}</span>
-              <button className="delete-btn" onClick={(e) => deleteSession(e, session.id)}>
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="main-content">
-        <div className="header-bar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {isSidebarCollapsed && (
-              <button 
-                className="sidebar-toggle-btn header-toggle-btn" 
-                onClick={() => setIsSidebarCollapsed(false)}
-                title="Open sidebar"
+              <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="16" width="16" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="9" y1="3" x2="9" y2="21"></line>
+                <path d="M17 16l-4-4 4-4"></path>
+              </svg>
+            </button>
+          </div>
+          <div className="history-list">
+            {sessions.map(session => (
+              <div 
+                key={session.id} 
+                className={`history-item ${session.id === currentSessionId ? 'active' : ''}`} 
+                onClick={() => loadSession(session.id)}
               >
-                <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="16" width="16" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="9" y1="3" x2="9" y2="21"></line>
-                  <path d="M13 8l4 4-4 4"></path>
-                </svg>
-              </button>
-            )}
-            <div className="header-logo">
-              <span className="logo-accent">RIYA</span>GPT
-            </div>
+                <span className="history-text">{session.title}</span>
+                <button className="delete-btn" onClick={(e) => deleteSession(e, session.id)}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
           </div>
-          <div className="header-model-selector" onClick={() => setShowModal(true)}>
-            <span className="model-indicator-dot"></span>
-            <span className="model-name-text">{activeModel}</span>
-          </div>
-        </div>
-
-        <div className="chat-container" ref={chatContainerRef} onScroll={handleScroll}>
-          {messages.map((msg, idx) => (
-            <div key={idx} className={`message-wrapper ${msg.role === 'user' ? 'user-message-wrapper' : 'ai-message-wrapper'}`}>
-              <div className="message-content">
-                <div className={`avatar ${msg.role === 'user' ? 'user-avatar' : 'ai-avatar'}`}>
-                  {msg.role === 'user' ? 'U' : 'AI'}
-                </div>
-                <div className="text">
-                  {msg.role === 'user' ? (
-                    msg.content
-                  ) : (
-                    <ReactMarkdown 
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-                        code({ inline, className, children, ...props }: any) {
-                          const match = /language-(\w+)/.exec(className || '');
-                          return !inline && match ? (
-                            <SyntaxHighlighter
-                              /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-                              style={vscDarkPlus as any}
-                              language={match[1]}
-                              PreTag="div"
-                              {...props}
-                            >
-                              {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                          ) : (
-                            <code className={className} {...props}>
-                              {children}
-                            </code>
-                          );
-                        }
-                      }}
-                    >
-                      {msg.content}
-                    </ReactMarkdown>
-                  )}
-                </div>
+        </aside>
+        <main className="main-content">
+          <div className="header-bar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {isSidebarCollapsed && (
+                <button 
+                  className="sidebar-toggle-btn header-toggle-btn" 
+                  onClick={() => setIsSidebarCollapsed(false)}
+                  title="Open sidebar"
+                >
+                  <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" height="16" width="16" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                    <path d="M13 8l4 4-4 4"></path>
+                  </svg>
+                </button>
+              )}
+              <div className="header-logo">
+                <span className="logo-accent">RIYA</span>GPT
               </div>
             </div>
-          ))}
-        </div>
-        
-        {showScrollDown && (
-          <button 
-            className="scroll-down-btn"
-            onClick={() => {
-              chatContainerRef.current?.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: 'smooth' });
-              // setShowScrollDown(false);
-            }}
-            title="Scroll to bottom"
-          >
-            ↓
-          </button>
-        )}
+            <div className="header-model-selector" onClick={() => setShowModal(true)}>
+              <span className="model-indicator-dot"></span>
+              <span className="model-name-text">{activeModel}</span>
+            </div>
+          </div>
 
-        <div className="input-container">
-          <form className="input-form" onSubmit={handleSend}>
-            <textarea
-              ref={textareaRef}
-              className="user-input"
-              placeholder="Send a message..."
-              rows={1}
-              value={inputValue}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
+          <div className="chat-container" ref={chatContainerRef} onScroll={handleScroll}>
+            {messages.map((msg, idx) => (
+              <div key={idx} className={`message-wrapper ${msg.role === 'user' ? 'user-message-wrapper' : 'ai-message-wrapper'}`}>
+                <div className="message-content">
+                  <div className={`avatar ${msg.role === 'user' ? 'user-avatar' : 'ai-avatar'}`}>
+                    {msg.role === 'user' ? 'U' : 'AI'}
+                  </div>
+                  <div className="text">
+                    {msg.role === 'user' ? (
+                      msg.content
+                    ) : (
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          code({ inline, className, children, ...props }: any) {
+                            const match = /language-(\\w+)/.exec(className || '');
+                            return !inline && match ? (
+                              <SyntaxHighlighter
+                                style={vscDarkPlus as any}
+                                language={match[1]}
+                                PreTag="div"
+                                {...props}
+                              >
+                                {String(children).replace(/\\n$/, '')}
+                              </SyntaxHighlighter>
+                            ) : (
+                              <code className={className} {...props}>
+                                {children}
+                              </code>
+                            );
+                          }
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {showScrollDown && (
+              <button 
+                className="scroll-down-btn"
+                onClick={() => {
+                  chatContainerRef.current?.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: 'smooth' });
+                }}
+                title="Scroll to bottom"
+              >
+                ↓
+              </button>
+            )}
+          </div>
+
+          <div className="input-container">
+            {attachments.length > 0 && (
+                <div className="attachment-preview-container">
+                  {attachments.map((file, index) => (
+                      <div key={index} className="thumbnail-wrapper">
+                        <img src={URL.createObjectURL(file)} alt="preview" className="attachment-thumbnail"/>
+                        <button className="remove-attachment-btn" onClick={() => removeAttachment(index)}>
+                          <X size={12} />
+                        </button>
+                      </div>
+                  ))}
+                </div>
+            )}
+            <input
+            type="file"
+            id="fileInput"
+            multiple
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleFilechange}
             />
-            <button type="submit" className="send-btn" disabled={!inputValue.trim() || isStreaming}>
-              <Send size={20} />
-            </button>
-          </form>
-        </div>
+
+            <form className="input-form" onSubmit={handleSend}>
+              <button
+                type="button"
+                className="attach-btn"
+                onClick={() => document.getElementById('fileInput')?.click()}>
+                <ImagePlus size={20} />
+              </button>
+              <textarea
+                ref={textareaRef}
+                className="user-input"
+                placeholder="Send a message..."
+                rows={1}
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+              />
+              <button type="submit" className="send-btn" disabled={!inputValue.trim() || isStreaming}>
+                <Send size={20} />
+              </button>
+            </form>
+          </div>
+        </main>
       </div>
 
       {showModal && (
@@ -439,7 +459,7 @@ function App() {
             <div className="modal-header">
               <h3>Model Specifications</h3>
               <button className="modal-close-btn" onClick={() => setShowModal(false)}>
-                <X size={18} />
+                <X size={18}/>
               </button>
             </div>
             <div className="modal-body">
@@ -491,22 +511,7 @@ function App() {
                         {modelDetails?.details?.details?.quantization_level || getModelDetails(activeModel).quantization}
                       </span>
                     </div>
-                    <div className="spec-card">
-                      <span className="spec-label">Format</span>
-                      <span className="spec-value">
-                        {(modelDetails?.details?.details?.format || getModelDetails(activeModel).format).toUpperCase()}
-                      </span>
-                    </div>
                   </div>
-
-                  {modelDetails?.details?.system && (
-                    <div className="model-system-prompt-section">
-                      <span className="spec-label">System Prompt / Instructions</span>
-                      <pre className="system-prompt-content">
-                        <code>{modelDetails.details.system}</code>
-                      </pre>
-                    </div>
-                  )}
                 </>
               )}
             </div>
@@ -516,5 +521,3 @@ function App() {
     </div>
   );
 }
-
-export default App;

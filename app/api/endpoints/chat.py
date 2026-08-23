@@ -6,6 +6,7 @@ from typing import Optional
 import uuid
 import os
 from dotenv import load_dotenv
+# import base64
 
 from app.services.session_service import SessionService
 from app.services.chat_service import ChatService
@@ -56,16 +57,15 @@ async def chat_endpoint(request: ChatRequest):
         session_service.create_new_session(session_id, user_message[:30] + "...")
 
     session_service.save_message(session_id, "user", user_message)
-
     return StreamingResponse(
-        chat_service.stream_chat(user_message, session_id, selected_model), 
-        media_type="text/plain", 
+        chat_service.stream_chat(user_message, session_id, selected_model),
+        media_type="text/plain",
         headers={"X-Session-ID": session_id}
     )
 
 @router.get("/api/models")
 async def get_model():
-    return OllamaService.list_models()
+    return chat_service.ollama.list_models()
 
 @router.get("/api/models/{model_name}")
 def get_model_info(model_name: str):
