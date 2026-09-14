@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -6,7 +6,7 @@ from typing import Optional
 import uuid
 import os
 from dotenv import load_dotenv
-# import base64
+import base64
 
 from app.services.session_service import SessionService
 from app.services.chat_service import ChatService

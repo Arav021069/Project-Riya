@@ -9,7 +9,13 @@ class ChatService:
         self.ollama = OllamaService()
         self.session_service = SessionService()
 
-    def stream_chat(self, user_message: str, session_id: str, selected_model: str) -> Generator[str, None, None]:
+    def stream_chat(self,
+                    user_message: str,
+                    session_id: str,
+                    selected_model: str,
+                    image_base64=None
+                    ) -> Generator[str, None, None]:
+
         """
         Orchestrates the chat flow: 
         1. Retrieves history 
@@ -25,7 +31,18 @@ class ChatService:
             # Inject System Prompt at the start of the conversation
             messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history_messages
             # Add the current user message
-            messages.append({"role": "user", "content": user_message})
+            # If there's an image, add it to the message'
+            if image_base64:
+                messages.append({
+                    "role": "user",
+                    "content": user_message,
+                    "images": [image_base64]
+                })
+            else:
+                messages.append({
+                    "role": "user",
+                    "content": user_message
+                })
 
             # Step 1: Call Ollama with tools enabled
             stream = self.ollama.chat(selected_model, messages, tools=OLLAMA_TOOLS)
